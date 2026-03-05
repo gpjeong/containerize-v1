@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: containerize-backend
-          image: containerize-backend:latest
+          image: harbor.devops.cicd.test/containerizev1/containerize-backend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
@@ -38,11 +38,11 @@ spec:
             failureThreshold: 3
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "250m"
+              memory: '256Mi'
+              cpu: '250m'
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: '512Mi'
+              cpu: '500m'
           volumeMounts:
             - name: uploads
               mountPath: /app/uploads

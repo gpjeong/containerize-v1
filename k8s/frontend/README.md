@@ -83,15 +83,19 @@ volumeMounts:
 |------|----|------|
 | 서비스 타입 | `NodePort` | 클러스터 외부(브라우저)에서 직접 접근 가능 |
 | 내부 포트 | `4000` | nginx 리스닝 포트 |
-| 노드 포트 | **`30400`** | 외부 접근 포트 |
+| 노드 포트 | 자동 할당 (30000~32767) | 배포 후 `kubectl get svc`로 확인 |
 
 ### 접속 URL
 
-```
-http://<NodeIP>:30400
+```bash
+# 할당된 NodePort 확인
+kubectl get svc containerize-frontend
+
+# 접속
+http://<NodeIP>:<할당된NodePort>
 ```
 
-- **minikube**: `http://$(minikube ip):30400`
+- **minikube**: `http://$(minikube ip):<할당된NodePort>`
 - **온프레미스/클라우드**: 워커 노드 IP로 접근
 
 ---
