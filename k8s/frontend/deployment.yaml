@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: containerize-frontend
+  labels:
+    app: containerize-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: containerize-frontend
+  template:
+    metadata:
+      labels:
+        app: containerize-frontend
+    spec:
+      containers:
+        - name: containerize-frontend
+          # production 스테이지 이미지를 사용합니다 (nginx 기반).
+          # 빌드: docker build --target production -t containerize-frontend:production .
+          image: containerize-frontend:production
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4000
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: frontend-nginx-config

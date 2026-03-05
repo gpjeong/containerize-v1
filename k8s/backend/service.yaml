@@ -1,0 +1,16 @@
+# 서비스 이름을 "backend"로 유지해야 합니다.
+# 프론트엔드 nginx가 proxy_pass http://backend:8000 으로 요청을 전달합니다.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  labels:
+    app: containerize-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: containerize-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
