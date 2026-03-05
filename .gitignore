@@ -1,0 +1,16 @@
+# OMC (oh-my-claudecode) 런타임 상태 데이터
+.omc/
+
+# 업로드 파일
+uploads/
+
+# 환경 변수
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# Docker 로컬 오버라이드
+docker-compose.override.yml
+docker-compose.override.yaml

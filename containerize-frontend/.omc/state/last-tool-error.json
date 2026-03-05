@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"# 컨테이너 빌드에 사용된 docker-compose 찾기 (containerize-tool 프로젝트명)\\nfind /Users/jeong-gwangpil/Desktop/Claude-workspace -name \\\"docker-compose*.yml\\\" -not -path \\\"*/containerize-v2/*\\\" 2>/dev/null...",
-  "error": "Exit code 1",
-  "timestamp": "2026-03-05T01:50:32.452Z",
-  "retry_count": 2
-}
