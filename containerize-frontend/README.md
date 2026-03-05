@@ -33,27 +33,38 @@ npm run preview
 ### Docker 실행
 
 ```bash
-docker build -t containerize-frontend .
-docker run -p 4000:4000 containerize-frontend
+# 개발 모드 (핫 리로드)
+docker build --target development -t containerize-frontend .
+docker run -p 4000:4000 \
+  -e API_TARGET=http://host.docker.internal:8000 \
+  -v $(pwd)/src:/app/src \
+  containerize-frontend
+
+# 프로덕션 모드 (nginx)
+docker build --target production -t containerize-frontend-prod .
+docker run -p 4000:4000 containerize-frontend-prod
 ```
 
-### docker-compose (풀스택)
+### docker-compose (풀스택, 권장)
 
-[containerize-tool](https://github.com/gpjeong/containerize-tool) 레포에서:
+프로젝트 루트에서:
 
 ```bash
-cd ../containerize-tool
-docker-compose up --build
+cd ..
+docker compose up -d --build
 ```
 
 ## 환경변수
 
-| 변수 | 기본값 | 설명 |
-|------|--------|------|
-| `VITE_API_URL` | `http://localhost:8000` | 백엔드 API URL (빌드 타임) |
-| `API_TARGET` | `http://localhost:8000` | 개발 서버 프록시 대상 (런타임) |
+| 변수 | 로컬 개발 | Docker 컨테이너 | 설명 |
+|------|-----------|-----------------|------|
+| `VITE_API_BASE_URL` | `http://localhost:8000` | `http://localhost:8000` | 브라우저에서 직접 호출하는 API URL (빌드 타임) |
+| `API_TARGET` | `http://localhost:8000` | `http://backend:8000` | Vite dev server 프록시 대상 (런타임) |
 
-`.env.example`을 `.env.local`로 복사하여 사용:
+> **Docker 컨테이너 주의사항**: 컨테이너 내부에서 `localhost`는 백엔드가 아닌 프론트엔드 컨테이너 자신을 가리킵니다.
+> Docker 환경에서는 반드시 `API_TARGET=http://backend:8000`으로 설정해야 합니다 (docker-compose.yaml에 이미 설정되어 있음).
+
+`.env.example`을 `.env.local`로 복사하여 로컬 개발 환경 설정:
 
 ```bash
 cp .env.example .env.local
@@ -96,8 +107,3 @@ src/
 | `npm run build` | 프로덕션 빌드 |
 | `npm run preview` | 빌드 결과 미리보기 |
 | `npm run lint` | ESLint 실행 |
-
-## 관련 레포
-
-- [containerize-backend](https://github.com/gpjeong/containerize-backend) - Spring Boot 백엔드
-- [containerize-tool](https://github.com/gpjeong/containerize-tool) - 프로젝트 허브 + docker-compose + 문서

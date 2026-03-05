@@ -148,45 +148,10 @@ docker run -d \
 
 ### Docker Compose로 한 번에 실행
 
-프로젝트 루트에 아래 내용으로 `docker-compose.yml` 파일을 생성합니다.
-
-```yaml
-services:
-  backend:
-    build:
-      context: ./containerize-backend
-      dockerfile: Dockerfile
-    container_name: containerize-backend
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./uploads:/app/uploads
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-
-  frontend:
-    build:
-      context: ./containerize-frontend
-      dockerfile: Dockerfile
-      target: development
-    container_name: containerize-frontend
-    ports:
-      - "4000:4000"
-    volumes:
-      - ./containerize-frontend/src:/app/src
-      - ./containerize-frontend/public:/app/public
-      - ./containerize-frontend/index.html:/app/index.html
-    depends_on:
-      backend:
-        condition: service_healthy
-```
+프로젝트 루트에 `docker-compose.yaml`이 포함되어 있습니다.
 
 ```bash
-# 빌드 및 실행
+# 빌드 및 실행 (개발 모드, 핫 리로드 지원)
 docker compose up -d --build
 
 # 로그 확인
@@ -194,6 +159,14 @@ docker compose logs -f
 
 # 중지
 docker compose down
+```
+
+> 프론트엔드는 기본적으로 개발 모드(핫 리로드)로 실행됩니다.
+> 프로덕션 모드로 실행하려면 `docker-compose.prod.yaml`을 함께 사용하세요.
+
+```bash
+# 프로덕션 모드
+COMPOSE_FILE=docker-compose.yaml:docker-compose.prod.yaml docker compose up -d --build
 ```
 
 ---
@@ -300,6 +273,8 @@ npm run build
 ## 보안
 
 - 파일 업로드 시 확장자(`.jar`, `.war`), Content-Type, Magic Number(바이트 시그니처), 파일 크기 4단계 검증
-- Rate Limiting 적용 (일반 요청 30/분, 업로드 등 무거운 요청 10/분)
+- 파일명 sanitization 및 경로 순회(Path Traversal) 방지
+- 세션 ID UUID 형식 검증
+- Rate Limiting 적용 (일반 요청 30/분, 업로드/생성 요청 10/분)
 - 비루트 사용자(`appuser`)로 컨테이너 실행
 - 업로드 파일 세션 기반 격리 및 1시간 후 자동 삭제
