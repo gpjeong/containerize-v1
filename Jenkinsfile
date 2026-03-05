@@ -78,7 +78,7 @@ spec:
                     )]) {
                         sh """
                             git config --global http.sslVerify false
-                            git clone --branch develop https://\${GIT_USER}:\${GIT_PASS}@https://gitea.devops.cicd.test/gitea_admin/containerize-v1.git .
+                            git clone --branch develop https://\${GIT_USER}:\${GIT_PASS}@gitea.devops.cicd.test/gitea_admin/containerize-v1.git .
                         """
                     }
                 }
@@ -176,7 +176,7 @@ spec:
                             git config --global user.name 'Jenkins CI'
 
                             rm -rf /tmp/deploy-repo
-                            git clone --branch main https://\${GIT_USER}:\${GIT_PASS}@https://gitea.devops.cicd.test/gitea_admin/containerize-v1-deploy.git /tmp/deploy-repo
+                            git clone --branch main https://\${GIT_USER}:\${GIT_PASS}@gitea.devops.cicd.test/gitea_admin/containerize-v1-deploy.git /tmp/deploy-repo
                             cd /tmp/deploy-repo
 
                             if [ "${env.FRONTEND_CHANGED}" = "true" ]; then
