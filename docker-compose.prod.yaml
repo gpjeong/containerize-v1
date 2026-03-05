@@ -1,0 +1,7 @@
+services:
+  frontend:
+    build:
+      target: production
+    volumes: []
+    environment:
+      - VITE_API_BASE_URL=

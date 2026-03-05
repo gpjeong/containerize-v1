@@ -1,0 +1,3 @@
+app:
+  ssl:
+    trust-all: true
