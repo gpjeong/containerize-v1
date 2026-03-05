@@ -1,7 +1,9 @@
 package com.containerize.util;
 
 import com.containerize.config.AppConfig;
+import com.containerize.exception.InvalidFileException;
 import com.containerize.exception.ServiceException;
+import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,15 +29,18 @@ public class SessionManager {
     private static final String DOCKERFILE_FILENAME = "Dockerfile";
 
     private final AppConfig appConfig;
+    private final SecurityUtil securityUtil;
     private final ScheduledExecutorService scheduledExecutor;
 
     /**
      * Constructor for SessionManager.
      *
-     * @param appConfig the application configuration
+     * @param appConfig    the application configuration
+     * @param securityUtil the security utility for file validation
      */
-    public SessionManager(AppConfig appConfig) {
+    public SessionManager(AppConfig appConfig, SecurityUtil securityUtil) {
         this.appConfig = appConfig;
+        this.securityUtil = securityUtil;
         this.scheduledExecutor = Executors.newScheduledThreadPool(1);
         ensureUploadDirectoryExists();
     }
@@ -56,7 +61,12 @@ public class SessionManager {
      * @return the path to the session directory
      */
     public Path getSessionDir(String sessionId) {
-        return Paths.get(appConfig.getUploadDir(), sessionId);
+        Path base = Paths.get(appConfig.getUploadDir()).toAbsolutePath().normalize();
+        Path resolved = base.resolve(sessionId).normalize();
+        if (!resolved.startsWith(base)) {
+            throw new InvalidFileException("Invalid session ID");
+        }
+        return resolved;
     }
 
     /**
@@ -84,8 +94,12 @@ public class SessionManager {
             Path sessionDir = getSessionDir(sessionId);
             Files.createDirectories(sessionDir);
 
-            // Save file with streaming
-            Path filePath = sessionDir.resolve(file.getOriginalFilename());
+            // Sanitize filename and validate path (C-2: prevent path traversal)
+            String sanitizedFilename = securityUtil.sanitizeFilename(file.getOriginalFilename());
+            Path filePath = sessionDir.resolve(sanitizedFilename).normalize();
+            if (!filePath.startsWith(sessionDir)) {
+                throw new InvalidFileException("Invalid file path");
+            }
             try (InputStream inputStream = file.getInputStream()) {
                 Files.copy(inputStream, filePath);
             }
@@ -185,8 +199,9 @@ public class SessionManager {
 
     /**
      * Shuts down the scheduled executor service.
-     * Should be called during application shutdown.
+     * Called automatically during application shutdown via @PreDestroy.
      */
+    @PreDestroy
     public void shutdown() {
         if (!scheduledExecutor.isShutdown()) {
             scheduledExecutor.shutdown();

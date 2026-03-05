@@ -86,51 +86,7 @@ export default function ConfigForm() {
     return true;
   };
 
-  const handleGenerate = async () => {
-    if (!validate()) return;
-
-    dispatch({ type: 'SET_LOADING', payload: true });
-    try {
-      const config: Record<string, any> = {
-        language: currentLanguage,
-        framework: isJava ? 'spring-boot' : 'generic',
-        runtime_version: '',
-        port: parseInt(port),
-        environment_vars: enableEnvVars ? parseEnvVars(envVars) : {},
-        health_check_path: enableHealthCheck ? healthCheck : null,
-        system_dependencies: enableSystemDeps ? parseSystemDeps(systemDeps) : [],
-        base_image: baseImage,
-        user: 'appuser',
-        service_url: serviceUrl,
-        custom_start_command: startCommand,
-      };
-
-      if (currentLanguage === 'python') {
-        config.package_manager = 'pip';
-        config.entrypoint_file = 'main.py';
-      } else if (currentLanguage === 'nodejs') {
-        config.package_manager = 'npm';
-        config.start_command = startCommand;
-      } else if (currentLanguage === 'java') {
-        config.build_tool = 'jar';
-        config.jar_file_name = currentJarFileName || 'app.jar';
-        config.jvm_options = '-Xmx512m';
-      }
-
-      const data = await generateDockerfile({ config });
-      dispatch({ type: 'SET_SESSION_ID', payload: data.session_id });
-      dispatch({ type: 'SET_DOCKERFILE', payload: data.dockerfile });
-    } catch (error: any) {
-      const msg = error.response?.data?.detail || error.message || 'Generation failed';
-      dispatch({ type: 'SHOW_ALERT', payload: { message: 'Dockerfile 생성 실패: ' + msg, type: 'error', isHtml: false } });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
-  };
-
-  // Expose form values for Jenkins step
-  // We'll use a data attribute on the form to pass config
-  const getConfigForJenkins = () => {
+  const buildConfig = (): Record<string, any> => {
     const config: Record<string, any> = {
       language: currentLanguage,
       framework: isJava ? 'spring-boot' : 'generic',
@@ -159,6 +115,27 @@ export default function ConfigForm() {
 
     return config;
   };
+
+  const handleGenerate = async () => {
+    if (!validate()) return;
+
+    dispatch({ type: 'SET_LOADING', payload: true });
+    try {
+      const config = buildConfig();
+
+      const data = await generateDockerfile({ config });
+      dispatch({ type: 'SET_SESSION_ID', payload: data.session_id });
+      dispatch({ type: 'SET_DOCKERFILE', payload: data.dockerfile });
+    } catch (error: any) {
+      const msg = error.response?.data?.detail || error.message || 'Generation failed';
+      dispatch({ type: 'SHOW_ALERT', payload: { message: 'Dockerfile 생성 실패: ' + msg, type: 'error', isHtml: false } });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
+  // Expose form values for Jenkins step
+  const getConfigForJenkins = () => buildConfig();
 
   // Store getConfigForJenkins on window for cross-component access
   (window as any).__getDockerConfig = getConfigForJenkins;

@@ -5,9 +5,9 @@ import com.containerize.dto.response.UploadResponse;
 import com.containerize.service.FileAnalyzerService;
 import com.containerize.util.SecurityUtil;
 import com.containerize.util.SessionManager;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -23,21 +23,15 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class UploadController {
 
     private static final Logger logger = LoggerFactory.getLogger(UploadController.class);
 
-    @Autowired
-    private SecurityUtil securityUtil;
-
-    @Autowired
-    private SessionManager sessionManager;
-
-    @Autowired
-    private FileAnalyzerService fileAnalyzerService;
-
-    @Autowired
-    private com.containerize.config.AppConfig appConfig;
+    private final SecurityUtil securityUtil;
+    private final SessionManager sessionManager;
+    private final FileAnalyzerService fileAnalyzerService;
+    private final com.containerize.config.AppConfig appConfig;
 
     /**
      * Upload JAR/WAR file for analysis
@@ -97,6 +91,11 @@ public class UploadController {
     @GetMapping("/download/{sessionId}")
     public ResponseEntity<Resource> downloadDockerfile(@PathVariable String sessionId) {
         try {
+            // H-3: Validate UUID format to prevent path traversal
+            if (!sessionId.matches("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid session ID format");
+            }
+
             // Check if session exists
             if (!sessionManager.sessionExists(sessionId)) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found or expired");

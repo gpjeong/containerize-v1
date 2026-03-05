@@ -11,9 +11,9 @@ import com.containerize.service.FileAnalyzerService;
 import com.containerize.service.TemplateEngineService;
 import com.containerize.util.SessionManager;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,21 +25,15 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class DockerfileController {
 
     private static final Logger logger = LoggerFactory.getLogger(DockerfileController.class);
 
-    @Autowired
-    private FileAnalyzerService fileAnalyzerService;
-
-    @Autowired
-    private DockerfileGeneratorService dockerfileGeneratorService;
-
-    @Autowired
-    private TemplateEngineService templateEngineService;
-
-    @Autowired
-    private SessionManager sessionManager;
+    private final FileAnalyzerService fileAnalyzerService;
+    private final DockerfileGeneratorService dockerfileGeneratorService;
+    private final TemplateEngineService templateEngineService;
+    private final SessionManager sessionManager;
 
     /**
      * Analyze Python project from configuration
@@ -153,8 +147,9 @@ public class DockerfileController {
             // Generate session ID (saveDockerfile creates directory automatically)
             String sessionId = UUID.randomUUID().toString();
 
-            // Save Dockerfile to session
+            // Save Dockerfile to session and schedule cleanup after 1 hour (M-5)
             sessionManager.saveDockerfile(sessionId, dockerfileContent);
+            sessionManager.scheduleCleanup(sessionId);
 
             logger.info("Generated Dockerfile for {}/{}", projectInfo.getLanguage(), projectInfo.getFramework());
 

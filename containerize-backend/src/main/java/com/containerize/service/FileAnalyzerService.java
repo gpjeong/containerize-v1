@@ -80,10 +80,10 @@ public class FileAnalyzerService {
                 return createDefaultManifest();
             }
 
-            String manifestData = new String(
-                jar.getInputStream(manifestEntry).readAllBytes(),
-                StandardCharsets.UTF_8
-            );
+            String manifestData;
+            try (java.io.InputStream is = jar.getInputStream(manifestEntry)) {
+                manifestData = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            }
 
             Map<String, String> manifest = new HashMap<>();
 

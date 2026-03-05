@@ -6,9 +6,9 @@ import com.containerize.dto.response.JenkinsBuildResponse;
 import com.containerize.service.DockerfileGeneratorService;
 import com.containerize.service.JenkinsClientService;
 import com.containerize.service.PipelineGeneratorService;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,15 +19,13 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class JenkinsController {
 
     private static final Logger logger = LoggerFactory.getLogger(JenkinsController.class);
 
-    @Autowired
-    private DockerfileGeneratorService dockerfileGeneratorService;
-
-    @Autowired
-    private PipelineGeneratorService pipelineGeneratorService;
+    private final DockerfileGeneratorService dockerfileGeneratorService;
+    private final PipelineGeneratorService pipelineGeneratorService;
 
     /**
      * Preview Jenkins Pipeline script without triggering build
@@ -40,53 +38,9 @@ public class JenkinsController {
         try {
             logger.info("Generating pipeline preview for {}", request.getConfig().get("language"));
 
-            // Generate Dockerfile
-            ProjectInfo projectInfo = new ProjectInfo();
-            projectInfo.setLanguage((String) request.getConfig().get("language"));
-            projectInfo.setFramework((String) request.getConfig().getOrDefault("framework", "generic"));
-            projectInfo.setDetectedVersion((String) request.getConfig().get("runtime_version"));
-
-            String dockerfileContent = dockerfileGeneratorService.generate(
-                    projectInfo,
-                    request.getConfig()
-            );
-
-            // Generate Pipeline script for preview (with readable Dockerfile)
-            String pipelineScript;
-
-            if (request.isUseKubernetes() && request.isUseKaniko()) {
-                // Kubernetes with Kaniko (no privileged mode)
-                pipelineScript = pipelineGeneratorService.generateK8sKanikoPipelineScriptForPreview(
-                        request.getGitUrl(),
-                        request.getGitBranch(),
-                        request.getGitCredentialId(),
-                        dockerfileContent,
-                        request.getImageName(),
-                        request.getImageTag(),
-                        request.getHarborUrl(),
-                        request.getHarborCredentialId()
-                );
-            } else if (request.isUseKubernetes()) {
-                // Kubernetes with Docker-in-Docker
-                pipelineScript = pipelineGeneratorService.generateK8sPipelineScriptForPreview(
-                        request.getGitUrl(),
-                        request.getGitBranch(),
-                        request.getGitCredentialId(),
-                        dockerfileContent,
-                        request.getImageName(),
-                        request.getImageTag()
-                );
-            } else {
-                // Standard pipeline
-                pipelineScript = pipelineGeneratorService.generatePipelineScriptForPreview(
-                        request.getGitUrl(),
-                        request.getGitBranch(),
-                        request.getGitCredentialId(),
-                        dockerfileContent,
-                        request.getImageName(),
-                        request.getImageTag()
-                );
-            }
+            ProjectInfo projectInfo = buildProjectInfo(request);
+            String dockerfileContent = dockerfileGeneratorService.generate(projectInfo, request.getConfig());
+            String pipelineScript = selectPreviewPipelineScript(request, dockerfileContent);
 
             Map<String, String> result = new HashMap<>();
             result.put("pipeline_script", pipelineScript);
@@ -116,52 +70,12 @@ public class JenkinsController {
             logger.info("Jenkins build request for job: {}", request.getJenkinsJob());
 
             // 1. Generate Dockerfile
-            ProjectInfo projectInfo = new ProjectInfo();
-            projectInfo.setLanguage((String) request.getConfig().get("language"));
-            projectInfo.setFramework((String) request.getConfig().getOrDefault("framework", "generic"));
-            projectInfo.setDetectedVersion((String) request.getConfig().get("runtime_version"));
-
-            String dockerfileContent = dockerfileGeneratorService.generate(
-                    projectInfo,
-                    request.getConfig()
-            );
-
+            ProjectInfo projectInfo = buildProjectInfo(request);
+            String dockerfileContent = dockerfileGeneratorService.generate(projectInfo, request.getConfig());
             logger.info("Generated Dockerfile for {}/{}", projectInfo.getLanguage(), projectInfo.getFramework());
 
             // 2. Generate Pipeline script (Kubernetes or standard)
-            String pipelineScript;
-
-            if (request.isUseKubernetes() && request.isUseKaniko()) {
-                pipelineScript = pipelineGeneratorService.generateK8sKanikoPipelineScript(
-                        request.getGitUrl(),
-                        request.getGitBranch(),
-                        request.getGitCredentialId(),
-                        dockerfileContent,
-                        request.getImageName(),
-                        request.getImageTag(),
-                        request.getHarborUrl(),
-                        request.getHarborCredentialId()
-                );
-            } else if (request.isUseKubernetes()) {
-                pipelineScript = pipelineGeneratorService.generateK8sPipelineScript(
-                        request.getGitUrl(),
-                        request.getGitBranch(),
-                        request.getGitCredentialId(),
-                        dockerfileContent,
-                        request.getImageName(),
-                        request.getImageTag()
-                );
-            } else {
-                pipelineScript = pipelineGeneratorService.generatePipelineScript(
-                        request.getGitUrl(),
-                        request.getGitBranch(),
-                        request.getGitCredentialId(),
-                        dockerfileContent,
-                        request.getImageName(),
-                        request.getImageTag()
-                );
-            }
-
+            String pipelineScript = selectBuildPipelineScript(request, dockerfileContent);
             logger.info("Generated Pipeline script for image: {}:{}", request.getImageName(), request.getImageTag());
 
             // 3. Create Jenkins client and update + trigger build
@@ -317,6 +231,50 @@ public class JenkinsController {
         } catch (Exception e) {
             logger.error("Failed to create Jenkins job: {}", e.getMessage(), e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+        }
+    }
+
+    // ── Private helpers (L-2: extracted from duplicate logic) ──────────────
+
+    private ProjectInfo buildProjectInfo(JenkinsBuildRequest request) {
+        ProjectInfo projectInfo = new ProjectInfo();
+        projectInfo.setLanguage((String) request.getConfig().get("language"));
+        projectInfo.setFramework((String) request.getConfig().getOrDefault("framework", "generic"));
+        projectInfo.setDetectedVersion((String) request.getConfig().get("runtime_version"));
+        return projectInfo;
+    }
+
+    private String selectPreviewPipelineScript(JenkinsBuildRequest request, String dockerfileContent) {
+        if (request.isUseKubernetes() && request.isUseKaniko()) {
+            return pipelineGeneratorService.generateK8sKanikoPipelineScriptForPreview(
+                    request.getGitUrl(), request.getGitBranch(), request.getGitCredentialId(),
+                    dockerfileContent, request.getImageName(), request.getImageTag(),
+                    request.getHarborUrl(), request.getHarborCredentialId());
+        } else if (request.isUseKubernetes()) {
+            return pipelineGeneratorService.generateK8sPipelineScriptForPreview(
+                    request.getGitUrl(), request.getGitBranch(), request.getGitCredentialId(),
+                    dockerfileContent, request.getImageName(), request.getImageTag());
+        } else {
+            return pipelineGeneratorService.generatePipelineScriptForPreview(
+                    request.getGitUrl(), request.getGitBranch(), request.getGitCredentialId(),
+                    dockerfileContent, request.getImageName(), request.getImageTag());
+        }
+    }
+
+    private String selectBuildPipelineScript(JenkinsBuildRequest request, String dockerfileContent) {
+        if (request.isUseKubernetes() && request.isUseKaniko()) {
+            return pipelineGeneratorService.generateK8sKanikoPipelineScript(
+                    request.getGitUrl(), request.getGitBranch(), request.getGitCredentialId(),
+                    dockerfileContent, request.getImageName(), request.getImageTag(),
+                    request.getHarborUrl(), request.getHarborCredentialId());
+        } else if (request.isUseKubernetes()) {
+            return pipelineGeneratorService.generateK8sPipelineScript(
+                    request.getGitUrl(), request.getGitBranch(), request.getGitCredentialId(),
+                    dockerfileContent, request.getImageName(), request.getImageTag());
+        } else {
+            return pipelineGeneratorService.generatePipelineScript(
+                    request.getGitUrl(), request.getGitBranch(), request.getGitCredentialId(),
+                    dockerfileContent, request.getImageName(), request.getImageTag());
         }
     }
 }

@@ -12,6 +12,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * IP-based Token Bucket rate limiter.
@@ -25,8 +26,11 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final int heavyRequestsPerMinute;
     private final ConcurrentHashMap<String, TokenBucket> buckets = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final AtomicInteger requestCounter = new AtomicInteger(0);
 
     private static final String[] HEAVY_PATH_PREFIXES = {"/api/upload", "/api/generate"};
+    private static final int CLEANUP_INTERVAL = 1000;
+    private static final long BUCKET_TTL_MS = 24 * 60 * 60 * 1000L; // 24 hours
 
     public RateLimitInterceptor(int generalRequestsPerMinute, int heavyRequestsPerMinute) {
         this.generalRequestsPerMinute = generalRequestsPerMinute;
@@ -35,6 +39,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        if (requestCounter.incrementAndGet() % CLEANUP_INTERVAL == 0) {
+            cleanupStaleBuckets();
+        }
+
         String clientIp = getClientIp(request);
         String path = request.getRequestURI();
         boolean isHeavy = isHeavyPath(path);
@@ -66,6 +74,12 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             }
         }
         return false;
+    }
+
+    private void cleanupStaleBuckets() {
+        long cutoff = System.currentTimeMillis() - BUCKET_TTL_MS;
+        buckets.entrySet().removeIf(e -> e.getValue().lastRefillTime < cutoff);
+        logger.debug("Rate limiter cleanup: {} buckets remaining", buckets.size());
     }
 
     private String getClientIp(HttpServletRequest request) {

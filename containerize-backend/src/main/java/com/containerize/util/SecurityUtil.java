@@ -15,6 +15,7 @@ public class SecurityUtil {
     private static final String JAR_CONTENT_TYPE = "application/java-archive";
     private static final String JAR_ALT_CONTENT_TYPE = "application/x-java-archive";
     private static final String ZIP_CONTENT_TYPE = "application/zip";
+    private static final String OCTET_STREAM_CONTENT_TYPE = "application/octet-stream";
     private static final byte[] ZIP_MAGIC_NUMBER = {0x50, 0x4B, 0x03, 0x04}; // PK\x03\x04
 
     /**
@@ -50,7 +51,8 @@ public class SecurityUtil {
         String normalizedContentType = contentType.toLowerCase().split(";")[0].trim();
         if (!normalizedContentType.equals(JAR_CONTENT_TYPE) &&
             !normalizedContentType.equals(JAR_ALT_CONTENT_TYPE) &&
-            !normalizedContentType.equals(ZIP_CONTENT_TYPE)) {
+            !normalizedContentType.equals(ZIP_CONTENT_TYPE) &&
+            !normalizedContentType.equals(OCTET_STREAM_CONTENT_TYPE)) {
             throw new InvalidFileException("Invalid Content-Type. Expected application/java-archive or application/zip, got: " + contentType);
         }
     }
